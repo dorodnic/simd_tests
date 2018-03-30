@@ -1,36 +1,41 @@
 #pragma once
 #include <vector>
 #include <assert.h>
+#include <type_traits>
 
 typedef unsigned char byte;
 
-template<class T, class S, S T::* ptr>
-struct offset_of_helper
-{
-    static constexpr int calc()
-    {
-        return offsetof(T, ptr);
-    }
-};
+template<class T>
+struct index_of_helper { };
 
-template<class T, class S, S T::* ptr>
-static constexpr T foo();
-
-template<class T, class S, S T::* ptr>
-static constexpr S goo();
-
-#define SET_OFFSET_OF(X, O) \
+#define SET_INDEX_OF(X, O)\
 template<>\
-struct offset_of_helper<decltype(foo<X>()), decltype(goo<X>()), X>\
+struct index_of_helper<decltype(X)>\
 {\
-    static constexpr int calc()\
-    {\
-        return O;\
-    }\
+    static constexpr int calc() { return O; }\
 };
+
+#define ASSIGN_INDEXES_(T, A, B, C, D, E)\
+SET_INDEX_OF(A, 0);\
+SET_INDEX_OF(B, 1);\
+SET_INDEX_OF(C, 2);\
+SET_INDEX_OF(D, 3);\
+SET_INDEX_OF(E, 4);
+
+#define ASSIGN_INDEXES(T, ...)\
+namespace helper_##T {\
+struct A1 {}; struct B1 {}; struct C1 {}; struct D1 {}; struct E1 {};\
+ASSIGN_INDEXES_(T, __VA_ARGS__, A1(), B1(), C1(), D1(), E1())\
+}
 
 namespace simd
 {
+    template<class T, class S, T S::* ptr>
+    static constexpr int index_of()
+    {
+        return index_of_helper<decltype(ptr)>::calc();
+    }
+
     enum engine_type
     {
         DEFAULT,
@@ -388,7 +393,7 @@ namespace simd
             {
                 gather_type result;
 
-                gather_loop<offset(ptr), gather_type::blocks>::gather(block, result);
+                gather_loop<index_of<T1, D1, ptr>(), gather_type::blocks>::gather(block, result);
                 
                 return result;
             }
