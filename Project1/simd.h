@@ -5,35 +5,12 @@
 
 typedef unsigned char byte;
 
-template<class T>
-struct index_of_helper { };
-
-#define SET_INDEX_OF(X, O)\
-template<>\
-struct index_of_helper<decltype(X)>\
-{\
-    static constexpr int calc() { return O; }\
-};
-
-#define ASSIGN_INDEXES_(T, A, B, C, D, E)\
-SET_INDEX_OF(A, 0);\
-SET_INDEX_OF(B, 1);\
-SET_INDEX_OF(C, 2);\
-SET_INDEX_OF(D, 3);\
-SET_INDEX_OF(E, 4);
-
-#define ASSIGN_INDEXES(T, ...)\
-namespace helper_##T {\
-struct A1 {}; struct B1 {}; struct C1 {}; struct D1 {}; struct E1 {};\
-ASSIGN_INDEXES_(T, __VA_ARGS__, A1(), B1(), C1(), D1(), E1())\
-}
-
 namespace simd
 {
     template<class T, class S, T S::* ptr>
     static constexpr int index_of()
     {
-        return index_of_helper<decltype(ptr)>::calc();
+        return index_of_helper<T, S, ptr>::calc();
     }
 
     enum engine_type
@@ -99,11 +76,24 @@ namespace simd
             {
                 *ptr = _data;
             }
+            operator underlying_type() const { return _data; }
 
         private:
             underlying_type _data;
         };
 
+        template<class T, unsigned int START, unsigned int GAP>
+        struct gather_utils {};
+
+        template<unsigned int START, unsigned int GAP>
+        struct gather_utils<float, START, GAP>
+        {
+            template<class GT, class QT, unsigned int I>
+            static constexpr void gather(QT& res, GT& result)
+            {
+                result.assign(I, res.fetch(START));
+            }
+        };
     };
 
     template<>
@@ -111,7 +101,6 @@ namespace simd
     {
         template<typename T>
         struct native_simd {};
-
 
         template<>
         struct native_simd<uint16_t>
@@ -164,6 +153,7 @@ namespace simd
             {
                 _mm_storeu_si128(ptr, _data);
             }
+            operator underlying_type() const { return _data; }
 
         private:
             underlying_type _data;
@@ -212,9 +202,135 @@ namespace simd
             {
                 _mm_storeu_ps((float*)ptr, _data);
             }
+            operator underlying_type() const { return _data; }
 
         private:
             underlying_type _data;
+        };
+
+        template<class T, unsigned int START, unsigned int GAP>
+        struct gather_utils {};
+
+        template<unsigned int START, unsigned int GAP>
+        struct gather_utils<float, START, GAP>
+        {
+            enum { block_width = sizeof(native_simd<float>::underlying_type) / sizeof(float) };
+            enum { bits_in_byte = 8 };
+
+            static __m128i convt(const unsigned int x)
+            {
+                return  _mm_set_epi32(
+                    (x & 0xff000000) ? 0xffffffff : 0, 
+                    (x & 0x00ff0000) ? 0xffffffff : 0, 
+                    (x & 0x0000ff00) ? 0xffffffff : 0, 
+                    (x & 0x000000ff) ? 0xffffffff : 0);
+            }
+
+            template<unsigned int line>
+            static constexpr unsigned int mask()
+            {
+                return  1 << index<line>() * bits_in_byte | ((create_mask<num_of_items<line>()>()) << (index<line>() + 1) * bits_in_byte);
+            }
+
+            template<unsigned int num_of_items>
+            static constexpr unsigned int create_mask()
+            {
+                return 1 | create_mask<num_of_items - 1>() << bits_in_byte;
+            }
+            template<>
+            static constexpr unsigned int create_mask<1>()
+            {
+                return  0;
+            }
+
+            template<unsigned int line>
+            static constexpr unsigned int start()
+            {
+                return (start<line - 1>() + num_of_items<line - 1>() * GAP) % block_width;
+            }
+            template<>
+            static constexpr unsigned int start<1>()
+            {
+                return START;
+            }
+
+            template<unsigned int line>
+            static constexpr unsigned int num_of_items()
+            {
+                return (3 - start<line>()) / GAP + 1;
+            }
+            template<>
+            static constexpr unsigned int num_of_items<0>()
+            {
+                return 0;
+            }
+
+            template<unsigned int line>
+            static constexpr unsigned int index()
+            {
+                return index<line - 1>() + num_of_items<line - 1>();
+            }
+            template<>
+            static constexpr unsigned int index<1>()
+            {
+                return 0;
+            }
+
+            template<unsigned int line>
+            static constexpr unsigned int calc()
+            {
+                return (_MM_SHUFFLE(start<line>() + 3 * GAP, 
+                                    start<line>() + 2 * GAP, 
+                                    start<line>() + GAP, 
+                                    start<line>()) 
+                        << index<line>() * 2);
+            }
+
+            template<class GT, class QT, unsigned int I, unsigned int J>
+            static void do_gather(QT& res, GT& result)
+            {
+                auto s1 = res.fetch(J);
+
+                const auto shuffle = calc<J + 1>();
+
+                auto res1 = _mm_shuffle_ps(s1, s1, shuffle);
+                auto res1i = _mm_castps_si128(res1);
+
+                const auto maskJ = mask<J + 1>();
+
+                res1i = _mm_and_si128(res1i, convt(maskJ));
+                res1 = _mm_castsi128_ps(res1i);
+
+                auto so_far = result.fetch(I);
+                result.assign(I, _mm_or_ps(res1, so_far));
+            }
+
+            template<class GT, class QT, unsigned int I, unsigned int J>
+            struct gather_loop
+            {
+                static constexpr void gather(QT& res, GT& result)
+                {
+                    do_gather<GT, QT, I, J>(res, result);
+                    gather_loop<GT, QT, I, J - 1>::gather(res, result);
+                }
+            };
+            template<class GT, class QT, unsigned int I>
+            struct gather_loop<GT, QT, I, 0>
+            {
+                static constexpr void gather(QT& res, GT& result)
+                {
+                    do_gather<GT, QT, I, 0>(res, result);
+                }
+            };
+
+            template<class GT, class QT, unsigned int I>
+            static constexpr void gather(QT& res, GT& result)
+            {
+                // Go over every block of QT
+                // Do gather on it
+                // Merge everything into block GT[I]
+                gather_loop<GT, QT, I, QT::blocks - 1>::gather(res, result);
+            }
         };
     };
 
@@ -243,6 +359,7 @@ namespace simd
         {
             _data[idx] = val;
         }
+        inline const simd_t& fetch(int idx) const { return _data[idx]; }
 
         template<int START, int COUNT>
         vector<E, T, COUNT> subset() const
@@ -363,37 +480,40 @@ namespace simd
                 return &_owner->_src[_index * width_in];
             }
 
-            template<int OFFSET, int I>
+            template<int INDEX, int I>
             static void perform_gather(const input_type& block, gather_type& result)
             {
-                auto res = block.subset<I * gather_type::blocks, gather_type::blocks>();
-                // Now we need to somehow gather from res into block[i]
+                auto res = block.subset<I * elements_in, elements_in>();
+                // Now we need to somehow gather from res into result[i]
+
+                engine<ET>::template gather_utils<typename T1, INDEX, elements_in>
+                    ::template gather<gather_type, decltype(res), I>(res, result);
             }
 
-            template<int OFFSET, int I>
+            template<int INDEX, int I>
             struct gather_loop
             {
                 static void gather(const input_type& block, gather_type& result)
                 {
-                    perform_gather<OFFSET, I>(block, result);
-                    gather_loop<OFFSET, I - 1>::gather(block, result);
+                    perform_gather<INDEX, I>(block, result);
+                    gather_loop<INDEX, I - 1>::gather(block, result);
                 }
             };
-            template<int OFFSET>
-            struct gather_loop<OFFSET, 0>
+            template<int INDEX>
+            struct gather_loop<INDEX, 0>
             {
                 static void gather(const input_type& block, gather_type& result)
                 {
-                    perform_gather<OFFSET, 0>(block, result);
+                    perform_gather<INDEX, 0>(block, result);
                 }
             };
 
-            template<T1 D1::*ptr>
+            template<unsigned int INDEX>
             gather_type gather(const input_type& block)
             {
                 gather_type result;
 
-                gather_loop<index_of<T1, D1, ptr>(), gather_type::blocks>::gather(block, result);
+                gather_loop<INDEX, input_type::blocks / elements_in - 1>::gather(block, result);
                 
                 return result;
             }

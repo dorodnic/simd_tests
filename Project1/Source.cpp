@@ -8,10 +8,6 @@ struct float2 { float x; float y; };
 struct float3 { float x; float y; float z; };
 struct float5 { float x; float y; float z; float w; float u; };
 
-ASSIGN_INDEXES(float2, &float2::x, &float2::y);
-ASSIGN_INDEXES(float3, &float3::x, &float3::y, &float3::z);
-ASSIGN_INDEXES(float5, &float5::x, &float5::y, &float5::z, &float5::w, &float5::u);
-
 template<class T>
 void measure(T func)
 {
@@ -40,7 +36,9 @@ void main()
         for (auto i : simd_ptr)
         {
             auto block = i.load();
-            auto res = i.gather<&float3::x>(block);
+            auto x = i.gather<0>(block);
+            auto y = i.gather<1>(block);
+            auto z = i.gather<2>(block);
 
             i.store(block);
         }
