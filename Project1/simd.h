@@ -110,7 +110,7 @@ namespace simd
                 const auto i = I;
                 const auto s = START;
                 const auto g = GAP;
-                output_block.assign(I * GAP + START, curr_var.fetch(START));
+                output_block.assign(I * GAP + START, curr_var.fetch(I));
                 //result.assign(I, res.fetch(START));
             }
         };
