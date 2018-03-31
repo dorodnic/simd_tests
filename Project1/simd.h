@@ -91,10 +91,10 @@ namespace simd
         template<unsigned int START, unsigned int GAP>
         struct gather_utils<float, START, GAP>
         {
-            template<class GT, class QT, unsigned int I>
+            template<class GT, class QT>
             static constexpr void gather(const QT& res, GT& result)
             {
-                result.assign(I, res.fetch(START));
+                result.assign(0, res.fetch(START));
             }
         };
 
@@ -572,6 +572,12 @@ namespace simd
               << sizeof(output_underlying_type) * width_out / sizeof(D2) << " x "
               << typeid(D2).name() << "\t"
               << "\n";
+        }
+        
+        template<class T>
+        void apply(T action)
+        {
+            action(*this);
         }
 
         class iterator

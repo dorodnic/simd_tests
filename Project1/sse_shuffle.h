@@ -73,3 +73,5 @@ namespace simd
         SET_SCATTER_SHUFFLE(5, 4, 4, _MM_SHUFFLE(3, 0, 0, 0), 0xFF000000);
     }
 }
+
+#undef SET_SCATTER_SHUFFLE
