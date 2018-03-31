@@ -2,6 +2,9 @@
 #include <vector>
 #include <assert.h>
 #include <type_traits>
+#include <tmmintrin.h>
+
+#include "sse_shuffle.h"
 
 typedef unsigned char byte;
 
@@ -101,13 +104,10 @@ namespace simd
         template<unsigned int START, unsigned int GAP>
         struct scatter_utils<float, START, GAP>
         {
-            template<class OT, class ST, unsigned int I>
+            template<class OT, class ST>
             static void scatter(OT& output_block, const ST& curr_var)
             {
-                const auto i = I;
-                const auto s = START;
-                const auto g = GAP;
-                output_block.assign(I * GAP + START, curr_var.fetch(I));
+                output_block.assign(START, curr_var.fetch(0));
             }
         };
     };
@@ -224,6 +224,15 @@ namespace simd
             underlying_type _data;
         };
 
+        static __m128i load_mask(unsigned int x)
+        {
+            return  _mm_set_epi32(
+                (x & 0xff000000) ? 0xffffffff : 0,
+                (x & 0x00ff0000) ? 0xffffffff : 0,
+                (x & 0x0000ff00) ? 0xffffffff : 0,
+                (x & 0x000000ff) ? 0xffffffff : 0);
+        }
+
         template<class T, unsigned int START, unsigned int GAP>
         struct gather_utils {};
 
@@ -232,15 +241,6 @@ namespace simd
         {
             enum { block_width = sizeof(native_simd<float>::underlying_type) / sizeof(float) };
             enum { bits_in_byte = 8 };
-
-            static __m128i convt(const unsigned int x)
-            {
-                return  _mm_set_epi32(
-                    (x & 0xff000000) ? 0xffffffff : 0, 
-                    (x & 0x00ff0000) ? 0xffffffff : 0, 
-                    (x & 0x0000ff00) ? 0xffffffff : 0, 
-                    (x & 0x000000ff) ? 0xffffffff : 0);
-            }
 
             template<unsigned int line>
             static constexpr unsigned int mask()
@@ -314,7 +314,7 @@ namespace simd
 
                 const auto maskJ = mask<J + 1>();
 
-                res1i = _mm_and_si128(res1i, convt(maskJ));
+                res1i = _mm_and_si128(res1i, load_mask(maskJ));
                 res1 = _mm_castsi128_ps(res1i);
 
                 auto so_far = result.fetch(0);
@@ -355,15 +355,65 @@ namespace simd
         template<unsigned int START, unsigned int GAP>
         struct scatter_utils<float, START, GAP>
         {
-            template<class OT, class ST, unsigned int I>
+            template<class OT, class ST, unsigned int LINE>
+            static void do_scatter(OT& output_block, const ST& curr_var)
+            {
+                const auto gap = GAP;
+                const auto start = START;
+                const auto line = LINE;
+
+                const auto shuf = sse::scatter_shuffle<GAP, START, LINE>::shuffle();
+                const auto mask = sse::scatter_shuffle<GAP, START, LINE>::mask();
+
+                // Take the value from curr_var[0],
+                // (being var with offset START and GAP)
+                // and scatter it over output_block[LINE]
+
+                auto s1 = curr_var.fetch(0);
+                auto res1 = _mm_shuffle_ps(s1, s1, shuf);
+
+                auto res1i = _mm_castps_si128(res1);
+                res1i = _mm_and_si128(res1i, load_mask(mask));
+                res1 = _mm_castsi128_ps(res1i);
+
+                //auto s1 = res.fetch(J);
+
+                //const auto shuffle = calc<J + 1>();
+
+                //auto res1 = _mm_shuffle_ps(s1, s1, shuffle);
+                //auto res1i = _mm_castps_si128(res1);
+
+                //const auto maskJ = mask<J + 1>();
+
+                //res1i = _mm_and_si128(res1i, convt(maskJ));
+                //res1 = _mm_castsi128_ps(res1i);
+
+                auto so_far = output_block.fetch(LINE);
+                output_block.assign(LINE, _mm_or_ps(res1, so_far));
+            }
+
+            template<class OT, class ST, unsigned int J>
+            struct scatter_loop
+            {
+                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                {
+                    do_scatter<OT, ST, J>(output_block, curr_var);
+                    scatter_loop<OT, ST, J - 1>::scatter(output_block, curr_var);
+                }
+            };
+            template<class OT, class ST>
+            struct scatter_loop<OT, ST, 0>
+            {
+                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                {
+                    do_scatter<OT, ST, 0>(output_block, curr_var);
+                }
+            };
+
+            template<class OT, class ST>
             static void scatter(OT& output_block, const ST& curr_var)
             {
-                const auto i = I;
-                const auto s = START;
-                const auto g = GAP;
-                auto val = curr_var.fetch(I);
-
-                output_block.assign(I * GAP + START, val);
+                scatter_loop<OT, ST, OT::blocks - 1>::scatter(output_block, curr_var);
             }
         };
     };
@@ -566,7 +616,7 @@ namespace simd
                 const auto idx = INDEX;
                 const auto start = elements_out - INDEX - 1;
                 engine<ET>::template scatter_utils<typename T2, elements_out - INDEX - 1, elements_out>
-                    ::template scatter<output_type, scatter_type, 0>(block, result);
+                    ::template scatter<output_type, scatter_type>(block, result);
             }
 
             template<int INDEX, class T, class... A>
@@ -586,7 +636,6 @@ namespace simd
                     perform_scatter<0>(result, t);
                 }
             };
-
 
         public:
             template<class T, class... A>

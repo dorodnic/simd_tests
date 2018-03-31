@@ -2,7 +2,6 @@
 #include <iostream>
 #include <vector>
 
-#include <tmmintrin.h> // For SSE3 intrinsic used in unpack_yuy2_sse
 #include "simd.h"
 
 struct float2 { float x; float y; };
@@ -49,10 +48,7 @@ void main()
             auto y = i.gather<1>(block);
             auto z = i.gather<2>(block);
 
-            auto u = y;
-            auto v = z;
-
-            auto out_block = i.scatter(u, v, x);
+            auto out_block = i.scatter(x, y, z);
             i.store(out_block);
         }
     });
