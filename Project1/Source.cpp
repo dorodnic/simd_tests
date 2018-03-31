@@ -37,7 +37,7 @@ void main()
     }
 
     using namespace simd;
-    transformation<float, float3, float, float3, NAIVE> simd_ptr(input.data(), output.data(), 12 * 5);
+    transformation<float, float3, float, float3, DEFAULT> simd_ptr(input.data(), output.data(), 12 * 5);
     simd_ptr.print(std::cout);
 
     measure([&]()
@@ -53,7 +53,7 @@ void main()
             auto v = z;
 
             auto out_block = i.scatter(u, v, x);
-            //i.store(out_block);
+            i.store(out_block);
         }
     });
 

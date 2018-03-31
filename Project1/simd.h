@@ -302,7 +302,7 @@ namespace simd
                         << index<line>() * 2);
             }
 
-            template<class GT, class QT, unsigned int I, unsigned int J>
+            template<class GT, class QT, unsigned int J>
             static void do_gather(const QT& res, GT& result)
             {
                 auto s1 = res.fetch(J);
@@ -317,35 +317,35 @@ namespace simd
                 res1i = _mm_and_si128(res1i, convt(maskJ));
                 res1 = _mm_castsi128_ps(res1i);
 
-                auto so_far = result.fetch(I);
-                result.assign(I, _mm_or_ps(res1, so_far));
+                auto so_far = result.fetch(0);
+                result.assign(0, _mm_or_ps(res1, so_far));
             }
 
-            template<class GT, class QT, unsigned int I, unsigned int J>
+            template<class GT, class QT, unsigned int J>
             struct gather_loop
             {
                 static constexpr void gather(const QT& res, GT& result)
                 {
-                    do_gather<GT, QT, I, J>(res, result);
-                    gather_loop<GT, QT, I, J - 1>::gather(res, result);
+                    do_gather<GT, QT, J>(res, result);
+                    gather_loop<GT, QT, J - 1>::gather(res, result);
                 }
             };
-            template<class GT, class QT, unsigned int I>
-            struct gather_loop<GT, QT, I, 0>
+            template<class GT, class QT>
+            struct gather_loop<GT, QT, 0>
             {
                 static constexpr void gather(const QT& res, GT& result)
                 {
-                    do_gather<GT, QT, I, 0>(res, result);
+                    do_gather<GT, QT, 0>(res, result);
                 }
             };
 
-            template<class GT, class QT, unsigned int I>
+            template<class GT, class QT>
             static constexpr void gather(const QT& res, GT& result)
             {
                 // Go over every block of QT
                 // Do gather on it
                 // Merge everything into block GT[I]
-                gather_loop<GT, QT, I, QT::blocks - 1>::gather(res, result);
+                gather_loop<GT, QT, QT::blocks - 1>::gather(res, result);
             }
         };
 
@@ -543,7 +543,7 @@ namespace simd
             static void perform_gather(const input_type& block, gather_type& result)
             {
                 engine<ET>::template gather_utils<typename T1, INDEX, elements_in>
-                    ::template gather<gather_type, input_type, 0>(block, result);
+                    ::template gather<gather_type, input_type>(block, result);
             }
 
         public:
@@ -563,7 +563,9 @@ namespace simd
             template<int INDEX>
             static void perform_scatter(output_type& block, const scatter_type& result)
             {
-                engine<ET>::template scatter_utils<typename T2, elements_out - INDEX + 1, elements_out>
+                const auto idx = INDEX;
+                const auto start = elements_out - INDEX - 1;
+                engine<ET>::template scatter_utils<typename T2, elements_out - INDEX - 1, elements_out>
                     ::template scatter<output_type, scatter_type, 0>(block, result);
             }
 
