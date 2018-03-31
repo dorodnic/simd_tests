@@ -1,5 +1,6 @@
 #include <chrono>
 #include <iostream>
+#include <vector>
 
 #include <tmmintrin.h> // For SSE3 intrinsic used in unpack_yuy2_sse
 #include "simd.h"
@@ -24,12 +25,18 @@ void measure(T func)
 
 void main()
 {
-    float input[]{ 1.f, 11.f, 99.f, 2.f, 12.f, 98.f, 3.f, 13.f, 97.f, 4.f, 14.f, 98.f };
-    float output[12];
-    memset(output, 0, 12 * sizeof(float));
+    std::vector<float> input(12 * 16 * 10);
+    std::vector<float> output(12 * 16 * 10);
+
+    for (int i = 0; i < input.size(); i++)
+    {
+        if (i % 3 == 0) input[i] = i / 3;
+        if (i % 3 == 1) input[i] = 100 + i / 3;
+        if (i % 3 == 2) input[i] = 1000 - i / 3;
+    }
 
     using namespace simd;
-    transformation<float, float3, float, float3, DEFAULT> simd_ptr(input, output, 4);
+    transformation<float, float3, float, float5, NAIVE> simd_ptr(input.data(), output.data(), 12 * 5);
 
     measure([&]()
     {
@@ -40,7 +47,12 @@ void main()
             auto y = i.gather<1>(block);
             auto z = i.gather<2>(block);
 
-            i.store(block);
+            auto u = y;
+            auto v = z;
+
+            decltype(u) data[5] = { u, v, x, y, z };
+            auto out_block = i.scatter(data);
+            i.store(out_block);
         }
     });
 

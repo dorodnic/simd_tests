@@ -94,6 +94,26 @@ namespace simd
                 result.assign(I, res.fetch(START));
             }
         };
+
+        //engine<ET>::template scatter_utils<typename T2, INDEX, elements_out>
+        //    ::template scatter<scatter_type, I>(block, results[INDEX]);
+
+        template<class T, unsigned int START, unsigned int GAP>
+        struct scatter_utils {};
+
+        template<unsigned int START, unsigned int GAP>
+        struct scatter_utils<float, START, GAP>
+        {
+            template<class OT, class ST, unsigned int I>
+            static void scatter(OT& output_block, const ST& curr_var)
+            {
+                const auto i = I;
+                const auto s = START;
+                const auto g = GAP;
+                output_block.assign(I * GAP + START, curr_var.fetch(START));
+                //result.assign(I, res.fetch(START));
+            }
+        };
     };
 
     template<>
@@ -452,6 +472,7 @@ namespace simd
 
         typedef vector<engine<ET>, T1, width_in> input_type;
         typedef vector<engine<ET>, T1, width_in / elements_in> gather_type;
+        typedef vector<engine<ET>, T2, width_in / elements_in> scatter_type;
         typedef vector<engine<ET>, T2, width_out> output_type;
 
         transformation(T1 * input, T2 * output, int count) : _count(count)
@@ -475,10 +496,7 @@ namespace simd
 
             inline iterator operator*() { return *this; }
 
-            input_type load()
-            {
-                return &_owner->_src[_index * width_in];
-            }
+            /// ========================= GATHER ===============================================
 
             template<int INDEX, int I>
             static void perform_gather(const input_type& block, gather_type& result)
@@ -509,13 +527,64 @@ namespace simd
             };
 
             template<unsigned int INDEX>
-            gather_type gather(const input_type& block)
+            gather_type gather(const input_type& block) const
             {
                 gather_type result;
 
                 gather_loop<INDEX, input_type::blocks / elements_in - 1>::gather(block, result);
                 
                 return result;
+            }
+
+            /// ========================= SCATTER ===============================================
+            template<int INDEX, int I>
+            static void perform_scatter(output_type& block, scatter_type results[elements_out])
+            {
+                engine<ET>::template scatter_utils<typename T2, INDEX, elements_out>
+                    ::template scatter<output_type, scatter_type, I>(block, results[INDEX]);
+            }
+
+            template<int INDEX, int I>
+            struct scatter_loop
+            {
+                static void scatter(output_type& block, scatter_type results[elements_out])
+                {
+                    perform_scatter<INDEX, I>(block, results);
+                    scatter_loop<INDEX, I - 1>::scatter(block, results);
+                }
+            };
+            template<int INDEX>
+            struct scatter_loop<INDEX, 0>
+            {
+                static void scatter(output_type& block, scatter_type results[elements_out])
+                {
+                    perform_scatter<INDEX, 0>(block, results);
+                    scatter_loop<INDEX - 1, output_type::blocks / elements_out - 1>::scatter(block, results);
+                }
+            };
+            template<>
+            struct scatter_loop<0, 0>
+            {
+                static void scatter(output_type& block, scatter_type results[elements_out])
+                {
+                    perform_scatter<0, 0>(block, results);
+                }
+            };
+
+            output_type scatter(scatter_type results[elements_out]) const
+            {
+                output_type result;
+
+                scatter_loop<elements_out - 1, input_type::blocks / elements_out - 1>::scatter(result, results);
+
+                return result;
+            }
+
+            /// ========================= LOAD & STORE ===============================================
+
+            input_type load()
+            {
+                return &_owner->_src[_index * width_in];
             }
 
             void store(const output_type& val)
