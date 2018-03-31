@@ -7,6 +7,7 @@
 
 struct float2 { float x; float y; };
 struct float3 { float x; float y; float z; };
+struct float4 { float x; float y; float z; float w; };
 struct float5 { float x; float y; float z; float w; float u; };
 
 template<class T>
@@ -36,7 +37,8 @@ void main()
     }
 
     using namespace simd;
-    transformation<float, float3, float, float5, NAIVE> simd_ptr(input.data(), output.data(), 12 * 5);
+    transformation<float, float3, float, float3, NAIVE> simd_ptr(input.data(), output.data(), 12 * 5);
+    simd_ptr.print(std::cout);
 
     measure([&]()
     {
@@ -50,9 +52,8 @@ void main()
             auto u = y;
             auto v = z;
 
-            decltype(u) data[5] = { u, v, x, y, z };
-            auto out_block = i.scatter(data);
-            i.store(out_block);
+            auto out_block = i.scatter(u, v, x);
+            //i.store(out_block);
         }
     });
 

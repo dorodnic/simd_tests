@@ -89,14 +89,11 @@ namespace simd
         struct gather_utils<float, START, GAP>
         {
             template<class GT, class QT, unsigned int I>
-            static constexpr void gather(QT& res, GT& result)
+            static constexpr void gather(const QT& res, GT& result)
             {
                 result.assign(I, res.fetch(START));
             }
         };
-
-        //engine<ET>::template scatter_utils<typename T2, INDEX, elements_out>
-        //    ::template scatter<scatter_type, I>(block, results[INDEX]);
 
         template<class T, unsigned int START, unsigned int GAP>
         struct scatter_utils {};
@@ -111,7 +108,6 @@ namespace simd
                 const auto s = START;
                 const auto g = GAP;
                 output_block.assign(I * GAP + START, curr_var.fetch(I));
-                //result.assign(I, res.fetch(START));
             }
         };
     };
@@ -307,7 +303,7 @@ namespace simd
             }
 
             template<class GT, class QT, unsigned int I, unsigned int J>
-            static void do_gather(QT& res, GT& result)
+            static void do_gather(const QT& res, GT& result)
             {
                 auto s1 = res.fetch(J);
 
@@ -328,7 +324,7 @@ namespace simd
             template<class GT, class QT, unsigned int I, unsigned int J>
             struct gather_loop
             {
-                static constexpr void gather(QT& res, GT& result)
+                static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, I, J>(res, result);
                     gather_loop<GT, QT, I, J - 1>::gather(res, result);
@@ -337,19 +333,37 @@ namespace simd
             template<class GT, class QT, unsigned int I>
             struct gather_loop<GT, QT, I, 0>
             {
-                static constexpr void gather(QT& res, GT& result)
+                static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, I, 0>(res, result);
                 }
             };
 
             template<class GT, class QT, unsigned int I>
-            static constexpr void gather(QT& res, GT& result)
+            static constexpr void gather(const QT& res, GT& result)
             {
                 // Go over every block of QT
                 // Do gather on it
                 // Merge everything into block GT[I]
                 gather_loop<GT, QT, I, QT::blocks - 1>::gather(res, result);
+            }
+        };
+
+        template<class T, unsigned int START, unsigned int GAP>
+        struct scatter_utils {};
+
+        template<unsigned int START, unsigned int GAP>
+        struct scatter_utils<float, START, GAP>
+        {
+            template<class OT, class ST, unsigned int I>
+            static void scatter(OT& output_block, const ST& curr_var)
+            {
+                const auto i = I;
+                const auto s = START;
+                const auto g = GAP;
+                auto val = curr_var.fetch(I);
+
+                output_block.assign(I * GAP + START, val);
             }
         };
     };
@@ -458,30 +472,56 @@ namespace simd
         typedef typename engine<ET>::template native_simd<T1>::underlying_type input_underlying_type;
         typedef typename engine<ET>::template native_simd<T2>::underlying_type output_underlying_type;
 
-        enum { blocks_in  = LCM<sizeof(D1) / sizeof(T1), 
-                                sizeof(input_underlying_type) / sizeof(T1)>::value };
-        enum { blocks_out = LCM<sizeof(D2) / sizeof(T2), 
-                                sizeof(output_underlying_type) / sizeof(T2)>::value };
-
-        enum { width_bytes  = LCM<blocks_in * sizeof(T1), blocks_out * sizeof(T2)>::value };
-        enum { width_in = width_bytes / sizeof(input_underlying_type) };
-        enum { width_out = width_bytes / sizeof(output_underlying_type) };
-
         enum { elements_in = sizeof(D1) / sizeof(T1) };
         enum { elements_out = sizeof(D2) / sizeof(T2) };
 
+        enum { blocks_gather  = sizeof(input_underlying_type) / sizeof(T1) };
+        enum { blocks_in      = blocks_gather * elements_in };
+        enum { blocks_out     = blocks_gather * elements_out * sizeof(T1) / sizeof(T2) };
+
+        enum { width_gather = (blocks_gather * sizeof(T1)) / sizeof(input_underlying_type) };
+        enum { width_in = (blocks_in * sizeof(T1)) / sizeof(input_underlying_type) };
+        enum { width_out = (blocks_out * sizeof(T2)) / sizeof(output_underlying_type) };
+
         typedef vector<engine<ET>, T1, width_in> input_type;
-        typedef vector<engine<ET>, T1, width_in / elements_in> gather_type;
-        typedef vector<engine<ET>, T2, width_in / elements_in> scatter_type;
+        typedef vector<engine<ET>, T1, width_gather> gather_type;
+        typedef vector<engine<ET>, T2, width_out / elements_out> scatter_type;
         typedef vector<engine<ET>, T2, width_out> output_type;
 
         transformation(T1 * input, T2 * output, int count) : _count(count)
         {
-            assert((count * sizeof(D1)) % (width_bytes) == 0);
-            assert((count * sizeof(D2)) % (width_bytes) == 0);
+            assert((count * sizeof(D1)) % (width_in * sizeof(input_underlying_type)) == 0);
+            assert((count * sizeof(D2)) % (width_out * sizeof(output_underlying_type)) == 0);
 
             _src = reinterpret_cast<const input_underlying_type*>(input);
             _dst = reinterpret_cast<output_underlying_type*>(output);
+        }
+
+        template<class S>
+        void print(S& s)
+        {
+            s << "Input Type:\t" << width_in << " x "
+              << typeid(input_underlying_type).name() << "\t"
+              << sizeof(input_underlying_type) * width_in << " bytes\t"
+              << sizeof(input_underlying_type) * width_in / sizeof(T1) << " x "
+              << typeid(T1).name() << "\t"
+              << sizeof(input_underlying_type) * width_in / sizeof(D1) << " x "
+              << typeid(D1).name() << "\t"
+              << "\n";
+            s << "Gather Type:\t" << width_gather
+              << " x " << typeid(input_underlying_type).name() << "\t"
+              << sizeof(input_underlying_type) * width_gather << " bytes\t"
+              << sizeof(input_underlying_type) * width_gather / sizeof(T1) << " x "
+              << typeid(T1).name() << "\t"
+              << "\n";
+            s << "Output Type:\t" << width_out << " x "
+              << typeid(output_underlying_type).name() << "\t"
+              << sizeof(output_underlying_type) * width_out << " bytes\t"
+              << sizeof(output_underlying_type) * width_out / sizeof(T2) << " x "
+              << typeid(T2).name() << "\t"
+              << sizeof(output_underlying_type) * width_out / sizeof(D2) << " x "
+              << typeid(D2).name() << "\t"
+              << "\n";
         }
 
         class iterator
@@ -498,85 +538,62 @@ namespace simd
 
             /// ========================= GATHER ===============================================
 
-            template<int INDEX, int I>
+        private:
+            template<int INDEX>
             static void perform_gather(const input_type& block, gather_type& result)
             {
-                auto res = block.subset<I * elements_in, elements_in>();
-                // Now we need to somehow gather from res into result[i]
-
                 engine<ET>::template gather_utils<typename T1, INDEX, elements_in>
-                    ::template gather<gather_type, decltype(res), I>(res, result);
+                    ::template gather<gather_type, input_type, 0>(block, result);
             }
 
-            template<int INDEX, int I>
-            struct gather_loop
-            {
-                static void gather(const input_type& block, gather_type& result)
-                {
-                    perform_gather<INDEX, I>(block, result);
-                    gather_loop<INDEX, I - 1>::gather(block, result);
-                }
-            };
-            template<int INDEX>
-            struct gather_loop<INDEX, 0>
-            {
-                static void gather(const input_type& block, gather_type& result)
-                {
-                    perform_gather<INDEX, 0>(block, result);
-                }
-            };
-
+        public:
             template<unsigned int INDEX>
             gather_type gather(const input_type& block) const
             {
-                gather_type result;
+                static_assert(INDEX < elements_in, "Must be a valid feild index!");
+                static_assert(input_type::blocks == elements_in, "No extra unrolling assumption!");
 
-                gather_loop<INDEX, input_type::blocks / elements_in - 1>::gather(block, result);
-                
+                gather_type result;
+                perform_gather<INDEX>(block, result);
                 return result;
             }
 
             /// ========================= SCATTER ===============================================
-            template<int INDEX, int I>
-            static void perform_scatter(output_type& block, scatter_type results[elements_out])
+        private:
+            template<int INDEX>
+            static void perform_scatter(output_type& block, const scatter_type& result)
             {
-                engine<ET>::template scatter_utils<typename T2, INDEX, elements_out>
-                    ::template scatter<output_type, scatter_type, I>(block, results[INDEX]);
+                engine<ET>::template scatter_utils<typename T2, elements_out - INDEX + 1, elements_out>
+                    ::template scatter<output_type, scatter_type, 0>(block, result);
             }
 
-            template<int INDEX, int I>
-            struct scatter_loop
+            template<int INDEX, class T, class... A>
+            struct scatter_helper
             {
-                static void scatter(output_type& block, scatter_type results[elements_out])
+                static void scatter_internal(output_type& result, const T& t, const A&... args)
                 {
-                    perform_scatter<INDEX, I>(block, results);
-                    scatter_loop<INDEX, I - 1>::scatter(block, results);
+                    perform_scatter<INDEX>(result, t);
+                    scatter_helper<INDEX - 1, A...>::scatter_internal(result, args...);
                 }
             };
-            template<int INDEX>
-            struct scatter_loop<INDEX, 0>
+            template<class T>
+            struct scatter_helper<0, T>
             {
-                static void scatter(output_type& block, scatter_type results[elements_out])
+                static void scatter_internal(output_type& result, const T& t)
                 {
-                    perform_scatter<INDEX, 0>(block, results);
-                    scatter_loop<INDEX - 1, output_type::blocks / elements_out - 1>::scatter(block, results);
-                }
-            };
-            template<>
-            struct scatter_loop<0, 0>
-            {
-                static void scatter(output_type& block, scatter_type results[elements_out])
-                {
-                    perform_scatter<0, 0>(block, results);
+                    perform_scatter<0>(result, t);
                 }
             };
 
-            output_type scatter(scatter_type results[elements_out]) const
+
+        public:
+            template<class T, class... A>
+            output_type scatter(const T& t, const A&... args) const
             {
+                static_assert(sizeof...(args) == elements_out - 1, 
+                    "Scatter must be called with exactly number of arguments in the output type!");
                 output_type result;
-
-                scatter_loop<elements_out - 1, input_type::blocks / elements_out - 1>::scatter(result, results);
-
+                scatter_helper<elements_out - 1, T, A...>::scatter_internal(result, t, args...);
                 return result;
             }
 
