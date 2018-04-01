@@ -39,11 +39,11 @@ namespace simd
             inline native_simd() : _data(T{}) {}
             inline native_simd(const native_simd& data) { _data = data._data; }
 
-            inline native_simd operator-(int y) const
+            inline native_simd operator-(float y) const
             {
                 return native_simd(_data - y);
             }
-            inline native_simd operator+(int y) const
+            inline native_simd operator+(float y) const
             {
                 return native_simd(_data + y);
             }
@@ -55,23 +55,27 @@ namespace simd
             {
                 return native_simd(_data - y._data);
             }
-            inline native_simd operator >> (int y) const
+            inline native_simd operator >> (float y) const
             {
                 return native_simd(_data >> y);
             }
-            inline native_simd operator<<(int y) const
+            inline native_simd operator<<(float y) const
             {
                 return native_simd(_data << y);
             }
-            inline native_simd operator*(int y) const
+            inline native_simd operator*(float y) const
             {
                 return native_simd(_data * y);
             }
-            inline native_simd min(int y) const
+            inline native_simd operator/(float y) const
+            {
+                return native_simd(_data / y);
+            }
+            inline native_simd min(float y) const
             {
                 return native_simd(std::min(_data, y));
             }
-            inline native_simd max(int y) const
+            inline native_simd max(float y) const
             {
                 return native_simd(std::max(_data, y));
             }
@@ -445,20 +449,18 @@ namespace simd
         }
         inline const simd_t& fetch(int idx) const { return _data[idx]; }
 
-        template<int START, int COUNT>
-        vector<E, T, COUNT> subset() const
-        {
-            vector<E, T, COUNT> result;
-            for (int i = 0; i < COUNT; i++)
-                result.assign(i, _data[START + i]);
-            return result;
-        }
-
         template<class F>
         inline vector(vector& from, F f)
         {
             for (int i = 0; i < K; i++)
-                data[i] = F(from._data[i]);
+                _data[i] = f(from._data[i]);
+        }
+
+        template<class F>
+        inline vector(vector& from, const vector& to, F f)
+        {
+            for (int i = 0; i < K; i++)
+                _data[i] = f(from._data[i], to._data[i]);
         }
 
         inline this_class operator-(float y)
@@ -471,11 +473,11 @@ namespace simd
         }
         inline this_class operator+(const this_class& y)
         {
-            return{ *this, [&](simd_t& item) { return item + y; } };
+            return{ *this, y, [&](simd_t& a,  const simd_t& b) { return a + b; } };
         }
         inline this_class operator-(const this_class& y)
         {
-            return{ *this, [&](simd_t& item) { return item - y; } };
+            return{ *this, y, [&](simd_t& a,  const simd_t& b) { return a - b; } };
         }
         inline this_class operator>>(float y)
         {
@@ -491,9 +493,9 @@ namespace simd
         }
         inline this_class operator/(const this_class& y)
         {
-            return{ *this, [&](simd_t& item) { return item / y; } };
+            return{ *this, y, [&](simd_t& a, const simd_t& b) { return a / b; } };
         }
-        inline this_class operator/(int y)
+        inline this_class operator/(float y)
         {
             return{ *this, [&](simd_t& item) { return item / y; } };
         }
