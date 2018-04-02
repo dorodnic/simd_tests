@@ -106,10 +106,13 @@ void main()
         rs2_intrinsics intr{ 640, 480, 100, 200, 50, 70 };
         rs2_extrinsics extr{ { 1.1, 0.9, 0.2, 0.3, 0.9, 0.7, 0, 0.2, 0.3 },{ 0.1, 0.5, 0.6 } };
 
+        auto input_ptr = (float3*)input.data();
+        auto output_ptr = (float2*)output.data();
+
         for (int i = 0; i < input_size; i++)
         {
-            auto&& xyz = ((float3*)input.data())[i];
-            auto&& xy = ((float2*)output.data())[i];
+            auto&& xyz = input_ptr[i];
+            auto&& xy = output_ptr[i];
 
             auto x = xyz.x; auto y = xyz.y; auto z = xyz.z;
 
@@ -126,8 +129,7 @@ void main()
             auto u = px / (intr.width);
             auto v = py / (intr.height);
 
-            xy.x = xyz.x / xyz.z;
-            xy.y = xyz.y / xyz.z;
+            xy.x = u; xy.y = v;
         }
     });
     measure([&]()
