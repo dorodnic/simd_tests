@@ -108,7 +108,7 @@ namespace simd
             this_type() = delete;
         };
 
-        static __m128i load_mask(unsigned int x)
+        FORCEINLINE static __m128i load_mask(unsigned int x)
         {
             return  _mm_set_epi32(
                 (x & 0xff000000) ? 0xffffffff : 0,
@@ -187,7 +187,7 @@ namespace simd
             }
 
             template<class GT, class QT, unsigned int J>
-            static void do_gather(const QT& res, GT& result)
+            FORCEINLINE static void do_gather(const QT& res, GT& result)
             {
                 auto s1 = res.fetch(J);
 
@@ -208,7 +208,7 @@ namespace simd
             template<class GT, class QT, unsigned int J>
             struct gather_loop
             {
-                static constexpr void gather(const QT& res, GT& result)
+                FORCEINLINE static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, J>(res, result);
                     gather_loop<GT, QT, J - 1>::gather(res, result);
@@ -217,14 +217,14 @@ namespace simd
             template<class GT, class QT>
             struct gather_loop<GT, QT, 0>
             {
-                static constexpr void gather(const QT& res, GT& result)
+                FORCEINLINE static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, 0>(res, result);
                 }
             };
 
             template<class GT, class QT>
-            static constexpr void gather(const QT& res, GT& result)
+            FORCEINLINE static constexpr void gather(const QT& res, GT& result)
             {
                 // Go over every block of QT
                 // Do gather on it
@@ -240,7 +240,7 @@ namespace simd
         struct scatter_utils<float, START, GAP>
         {
             template<class OT, class ST, unsigned int LINE>
-            static void do_scatter(OT& output_block, const ST& curr_var)
+            FORCEINLINE static void do_scatter(OT& output_block, const ST& curr_var)
             {
                 const auto gap = GAP;
                 const auto start = START;
@@ -267,7 +267,7 @@ namespace simd
             template<class OT, class ST, unsigned int J>
             struct scatter_loop
             {
-                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                FORCEINLINE static constexpr void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, J>(output_block, curr_var);
                     scatter_loop<OT, ST, J - 1>::scatter(output_block, curr_var);
@@ -276,14 +276,14 @@ namespace simd
             template<class OT, class ST>
             struct scatter_loop<OT, ST, 0>
             {
-                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                FORCEINLINE static constexpr void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, 0>(output_block, curr_var);
                 }
             };
 
             template<class OT, class ST>
-            static void scatter(OT& output_block, const ST& curr_var)
+            FORCEINLINE static void scatter(OT& output_block, const ST& curr_var)
             {
                 scatter_loop<OT, ST, OT::blocks - 1>::scatter(output_block, curr_var);
             }
