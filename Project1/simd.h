@@ -31,15 +31,15 @@ namespace simd
             typedef T representation_type;
 
             template<class S> // Load vector variable from memory
-            FORCEINLINE static void load(T& target, const S* other)
+            FORCEINLINE static void load(T& target, const S* source)
             {
-                target = *other;
+                target = *source;
             }
 
             template<class S> // Dump vector variable to memory
-            FORCEINLINE static void store(const T& target, S* other)
+            FORCEINLINE static void store(const T& source, S* target)
             {
-                *other = target;
+                *target = source;
             }
 
             template<class S> // Convert random constant to a "vector" type
@@ -552,6 +552,3 @@ namespace simd
     };
 
 }
-
-
-

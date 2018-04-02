@@ -102,7 +102,7 @@ void main()
     transformation<float, float3, float, float2, NAIVE>   simd_ptr((float*)input.data(), (float*)output.data(), input_size);
     transformation<float, float3, float, float2, DEFAULT> simd_ptr2((float*)input.data(), (float*)output.data(), input_size);
 
-    //simd_ptr.print(std::cout);
+    simd_ptr.print(std::cout);
     measure([&]()
     {
         rs2_intrinsics intr{ 640, 480, 100, 200, 50, 70 };
