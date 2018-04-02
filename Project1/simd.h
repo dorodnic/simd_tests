@@ -82,33 +82,99 @@ namespace simd
         template<typename T>
         struct native_simd {};
 
+        //template<>
+        //struct native_simd<float>
+        //{
+        //public:
+        //    typedef __m128 underlying_type;
+        //    typedef __m128 representation_type;
+        //    typedef native_simd<float> this_type;
+
+        //    FORCEINLINE static void load(representation_type& target, const underlying_type* other)
+        //    {
+        //        target = _mm_castsi128_ps(_mm_loadu_si128((const __m128i*)other));
+        //    }
+
+        //    FORCEINLINE static void store(const representation_type& src, underlying_type* target)
+        //    {
+        //        _mm_storeu_ps((float*)target, src);
+        //    }
+
+        //    FORCEINLINE static underlying_type vectorize(float x)
+        //    {
+        //        return _mm_set_ps1(x);
+        //    }
+        //private:
+        //    this_type() = delete;
+        //};
+
         template<>
         struct native_simd<float>
         {
         public:
             typedef __m128 underlying_type;
-            typedef __m128 representation_type;
+            typedef native_simd<float> representation_type;
             typedef native_simd<float> this_type;
 
             FORCEINLINE static void load(representation_type& target, const underlying_type* other)
             {
-                target = _mm_castsi128_ps(_mm_loadu_si128((const __m128i*)other));
+                target._data = _mm_castsi128_ps(_mm_loadu_si128((const __m128i*)other));
             }
 
             FORCEINLINE static void store(const representation_type& src, underlying_type* target)
             {
-                _mm_storeu_ps((float*)target, src);
+                _mm_storeu_ps((float*)target, src._data);
             }
 
             FORCEINLINE static underlying_type vectorize(float x)
             {
                 return _mm_set_ps1(x);
             }
+
+            FORCEINLINE native_simd(underlying_type data) : _data(data) {}
+            FORCEINLINE native_simd(const underlying_type* data) : _data(_mm_castsi128_ps(_mm_loadu_si128((const __m128i*)data))) {}
+            FORCEINLINE native_simd() : _data(_mm_set_ps1(0)) {}
+            FORCEINLINE native_simd(const native_simd& data) { _data = data._data; }
+
+            FORCEINLINE native_simd operator-(float y) const
+            {
+                return native_simd(_mm_sub_ps(_data, _mm_set_ps1(y)));
+            }
+            FORCEINLINE native_simd operator+(float y) const
+            {
+                return native_simd(*this + _mm_set_ps1(y));
+            }
+            FORCEINLINE native_simd operator+(const native_simd& y) const
+            {
+                return native_simd(_mm_add_ps(_data, y._data));
+            }
+            FORCEINLINE native_simd operator-(const native_simd& y) const
+            {
+                return native_simd(_mm_sub_ps(_data, y._data));
+            }
+            FORCEINLINE native_simd operator/(const native_simd& y) const
+            {
+                return native_simd(_mm_div_ps(_data, y._data));
+            }
+            FORCEINLINE native_simd operator/(float y) const
+            {
+                return native_simd(_mm_div_ps(_data, _mm_set_ps1(y)));
+            }
+            FORCEINLINE native_simd operator*(float y) const
+            {
+                return native_simd(_mm_mul_ps(_data, _mm_set_ps1(y)));
+            }
+            FORCEINLINE void store(underlying_type* ptr) const
+            {
+                _mm_storeu_ps((float*)ptr, _data);
+            }
+            operator underlying_type() const { return _data; }
+
         private:
-            this_type() = delete;
+            underlying_type _data;
         };
 
-        FORCEINLINE static __m128i load_mask(unsigned int x)
+        static __m128i load_mask(unsigned int x)
         {
             return  _mm_set_epi32(
                 (x & 0xff000000) ? 0xffffffff : 0,
@@ -187,7 +253,7 @@ namespace simd
             }
 
             template<class GT, class QT, unsigned int J>
-            FORCEINLINE static void do_gather(const QT& res, GT& result)
+            static void do_gather(const QT& res, GT& result)
             {
                 auto s1 = res.fetch(J);
 
@@ -208,7 +274,7 @@ namespace simd
             template<class GT, class QT, unsigned int J>
             struct gather_loop
             {
-                FORCEINLINE static constexpr void gather(const QT& res, GT& result)
+                static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, J>(res, result);
                     gather_loop<GT, QT, J - 1>::gather(res, result);
@@ -217,14 +283,14 @@ namespace simd
             template<class GT, class QT>
             struct gather_loop<GT, QT, 0>
             {
-                FORCEINLINE static constexpr void gather(const QT& res, GT& result)
+                static constexpr void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, 0>(res, result);
                 }
             };
 
             template<class GT, class QT>
-            FORCEINLINE static constexpr void gather(const QT& res, GT& result)
+            static constexpr void gather(const QT& res, GT& result)
             {
                 // Go over every block of QT
                 // Do gather on it
@@ -240,7 +306,7 @@ namespace simd
         struct scatter_utils<float, START, GAP>
         {
             template<class OT, class ST, unsigned int LINE>
-            FORCEINLINE static void do_scatter(OT& output_block, const ST& curr_var)
+            static void do_scatter(OT& output_block, const ST& curr_var)
             {
                 const auto gap = GAP;
                 const auto start = START;
@@ -267,7 +333,7 @@ namespace simd
             template<class OT, class ST, unsigned int J>
             struct scatter_loop
             {
-                FORCEINLINE static constexpr void scatter(OT& output_block, const ST& curr_var)
+                static constexpr void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, J>(output_block, curr_var);
                     scatter_loop<OT, ST, J - 1>::scatter(output_block, curr_var);
@@ -276,14 +342,14 @@ namespace simd
             template<class OT, class ST>
             struct scatter_loop<OT, ST, 0>
             {
-                FORCEINLINE static constexpr void scatter(OT& output_block, const ST& curr_var)
+                static constexpr void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, 0>(output_block, curr_var);
                 }
             };
 
             template<class OT, class ST>
-            FORCEINLINE static void scatter(OT& output_block, const ST& curr_var)
+            static void scatter(OT& output_block, const ST& curr_var)
             {
                 scatter_loop<OT, ST, OT::blocks - 1>::scatter(output_block, curr_var);
             }
@@ -313,9 +379,10 @@ namespace simd
                 vectorized_wrapper::store(_data[i], ptr + i);
         }
 
-        FORCEINLINE void assign(int idx, const simd_t& val)
+        FORCEINLINE void assign(int idx, simd_t val)
         {
-            vectorized_wrapper::load(_data[idx], &val);
+            //vectorized_wrapper::load(_data[idx], &val);
+            _data[idx] = val;
         }
         FORCEINLINE const simd_t& fetch(int idx) const { return _data[idx]; }
 
