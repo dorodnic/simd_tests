@@ -5,12 +5,7 @@
 #include <tmmintrin.h>
 
 #include "sse_shuffle.h"
-
-#ifdef _MSC_VER
-#define FORCEINLINE __forceinline
-#else
-#define FORCEINLINE inline __attribute__((always_inline))
-#endif
+#include "sse_operators.h"
 
 typedef unsigned char byte;
 
@@ -35,16 +30,22 @@ namespace simd
             typedef T underlying_type;
             typedef T representation_type;
 
-            template<class S>
-            FORCEINLINE static void constexpr load(T& target, S other)
+            template<class S> // Load vector variable from memory
+            FORCEINLINE static void load(T& target, const S* other)
             {
-                target = other;
+                target = *other;
             }
 
-            template<class S>
-            FORCEINLINE static void constexpr store(const T& target, S* other)
+            template<class S> // Dump vector variable to memory
+            FORCEINLINE static void store(const T& target, S* other)
             {
                 *other = target;
+            }
+
+            template<class S> // Convert random constant to a "vector" type
+            FORCEINLINE static underlying_type vectorize(S other)
+            {
+                return other;
             }
         };
 
@@ -82,139 +83,29 @@ namespace simd
         struct native_simd {};
 
         template<>
-        struct native_simd<uint16_t>
-        {
-        public:
-            typedef __m128i underlying_type;
-            typedef native_simd<uint16_t> representation_type;
-            typedef native_simd<float> this_type;
-
-            FORCEINLINE native_simd(underlying_type data) : _data(data) {}
-            FORCEINLINE native_simd(const underlying_type* data) : _data(_mm_loadu_si128(data)) {}
-            FORCEINLINE native_simd() : _data(_mm_set1_epi8(0)) {}
-            FORCEINLINE native_simd(const native_simd& data) { _data = data._data; }
-
-            FORCEINLINE native_simd operator-(int y) const
-            {
-                return native_simd(_mm_subs_epi16(_data, _mm_set1_epi16(y)));
-            }
-            FORCEINLINE native_simd operator+(int y) const
-            {
-                return native_simd(_mm_adds_epi16(_data, _mm_set1_epi16(y)));
-            }
-            FORCEINLINE native_simd operator+(const native_simd& y) const
-            {
-                return native_simd(_mm_adds_epi16(_data, y._data));
-            }
-            FORCEINLINE native_simd operator-(const native_simd& y) const
-            {
-                return native_simd(_mm_subs_epi16(_data, y._data));
-            }
-            FORCEINLINE native_simd operator>>(int y) const
-            {
-                return native_simd(_mm_slli_epi16(_data, y));
-            }
-            FORCEINLINE native_simd operator<<(int y) const
-            {
-                return native_simd(_mm_srai_epi16(_data, y));
-            }
-            FORCEINLINE native_simd operator*(int y) const
-            {
-                return native_simd(_mm_mulhi_epi16(_data, _mm_set1_epi16(y << 4)));
-            }
-            FORCEINLINE native_simd min(int y) const
-            {
-                return native_simd(_mm_min_epi16(_mm_set1_epi16(y), _data));
-            }
-            FORCEINLINE native_simd max(int y) const
-            {
-                return native_simd(_mm_max_epi16(_mm_set1_epi8(y), _data));
-            }
-            FORCEINLINE void store(underlying_type* ptr) const
-            {
-                _mm_storeu_si128(ptr, _data);
-            }
-            operator underlying_type() const { return _data; }
-
-            template<class S>
-            FORCEINLINE static void constexpr load(this_type& target, S other)
-            {
-                target.load(other);
-            }
-
-            template<class S>
-            FORCEINLINE static void constexpr store(const this_type& target, S* other)
-            {
-                target.store(other);
-            }
-        private:
-            underlying_type _data;
-        };
-
-        template<>
         struct native_simd<float>
         {
         public:
             typedef __m128 underlying_type;
-            typedef native_simd<float> representation_type;
+            typedef __m128 representation_type;
             typedef native_simd<float> this_type;
 
-            FORCEINLINE native_simd(underlying_type data) : _data(data) {}
-            FORCEINLINE native_simd(const underlying_type* data) : _data(_mm_castsi128_ps(_mm_loadu_si128((const __m128i*)data))) {}
-            FORCEINLINE native_simd() : _data(_mm_set_ps1(0)) {}
-            FORCEINLINE native_simd(const native_simd& data) { _data = data._data; }
-
-            FORCEINLINE native_simd operator-(float y) const
+            FORCEINLINE static void load(representation_type& target, const underlying_type* other)
             {
-                return native_simd(_mm_sub_ps(_data, _mm_set_ps1(y)));
-            }
-            FORCEINLINE native_simd operator+(float y) const
-            {
-                return native_simd(*this + _mm_set_ps1(y));
-            }
-            FORCEINLINE native_simd operator+(const native_simd& y) const
-            {
-                return native_simd(_mm_add_ps(_data, y._data));
-            }
-            FORCEINLINE native_simd operator-(const native_simd& y) const
-            {
-                return native_simd(_mm_sub_ps(_data, y._data));
-            }
-            FORCEINLINE native_simd operator/(const native_simd& y) const
-            {
-                return native_simd(_mm_div_ps(_data, y._data));
-            }
-            FORCEINLINE native_simd operator/(float y) const
-            {
-                return native_simd(_mm_div_ps(_data, _mm_set_ps1(y)));
-            }
-            FORCEINLINE native_simd operator*(float y) const
-            {
-                return native_simd(_mm_mul_ps(_data, _mm_set_ps1(y)));
-            }
-            FORCEINLINE void store(underlying_type* ptr) const
-            {
-                _mm_storeu_ps((float*)ptr, _data);
-            }
-            FORCEINLINE void load(const underlying_type& ptr)
-            {
-                _data = ptr;
-            }
-            operator underlying_type() const { return _data; }
-
-            template<class S>
-            FORCEINLINE static void constexpr load(this_type& target, S other)
-            {
-                target.load(other);
+                target = _mm_castsi128_ps(_mm_loadu_si128((const __m128i*)other));
             }
 
-            template<class S>
-            FORCEINLINE static void constexpr store(const this_type& target, S* other)
+            FORCEINLINE static void store(const representation_type& src, underlying_type* target)
             {
-                target.store(other);
+                _mm_storeu_ps((float*)target, src);
+            }
+
+            FORCEINLINE static underlying_type vectorize(float x)
+            {
+                return _mm_set_ps1(x);
             }
         private:
-            underlying_type _data;
+            this_type() = delete;
         };
 
         static __m128i load_mask(unsigned int x)
@@ -369,18 +260,6 @@ namespace simd
                 res1i = _mm_and_si128(res1i, load_mask(mask));
                 res1 = _mm_castsi128_ps(res1i);
 
-                //auto s1 = res.fetch(J);
-
-                //const auto shuffle = calc<J + 1>();
-
-                //auto res1 = _mm_shuffle_ps(s1, s1, shuffle);
-                //auto res1i = _mm_castps_si128(res1);
-
-                //const auto maskJ = mask<J + 1>();
-
-                //res1i = _mm_and_si128(res1i, convt(maskJ));
-                //res1 = _mm_castsi128_ps(res1i);
-
                 auto so_far = output_block.fetch(LINE);
                 output_block.assign(LINE, _mm_or_ps(res1, so_far));
             }
@@ -426,7 +305,7 @@ namespace simd
         FORCEINLINE vector(const typename underlying_t* src)
         {
             for (int i = 0; i < K; i++)
-                vectorized_wrapper::load(_data[i], src[i]);
+                vectorized_wrapper::load(_data[i], src + i);
         }
         FORCEINLINE void store(typename underlying_t* ptr) const
         {
@@ -436,7 +315,7 @@ namespace simd
 
         FORCEINLINE void assign(int idx, const simd_t& val)
         {
-            vectorized_wrapper::load(_data[idx], val);
+            vectorized_wrapper::load(_data[idx], &val);
         }
         FORCEINLINE const simd_t& fetch(int idx) const { return _data[idx]; }
 
@@ -456,11 +335,13 @@ namespace simd
 
         FORCEINLINE this_class operator-(float y)
         {
-            return{ *this, [&](simd_t& item) { return item - y; } };
+            auto vec_y = vectorized_wrapper::vectorize(y);
+            return{ *this, [&](simd_t& item) { return item - vec_y; } };
         }
         FORCEINLINE this_class operator+(float y)
         {
-            return{ *this, [&](simd_t& item) { return item + y; } };
+            auto vec_y = vectorized_wrapper::vectorize(y);
+            return{ *this, [&](simd_t& item) { return item + vec_y; } };
         }
         FORCEINLINE this_class operator+(const this_class& y)
         {
@@ -470,17 +351,10 @@ namespace simd
         {
             return{ *this, y, [&](simd_t& a,  const simd_t& b) { return a - b; } };
         }
-        FORCEINLINE this_class operator>>(float y)
-        {
-            return{ *this, [&](simd_t& item) { return item >> y; } };
-        }
-        FORCEINLINE this_class operator<<(float y)
-        {
-            return{ *this, [&](simd_t& item) { return item << y; } };
-        }
         FORCEINLINE this_class operator*(float y)
         {
-            return{ *this, [&](simd_t& item) { return item * y; } };
+            auto vec_y = vectorized_wrapper::vectorize(y);
+            return{ *this, [&](simd_t& item) { return item * vec_y; } };
         }
         FORCEINLINE this_class operator/(const this_class& y)
         {
@@ -488,7 +362,8 @@ namespace simd
         }
         FORCEINLINE this_class operator/(float y)
         {
-            return{ *this, [&](simd_t& item) { return item / y; } };
+            auto vec_y = vectorized_wrapper::vectorize(y);
+            return{ *this, [&](simd_t& item) { return item / vec_y; } };
         }
 
     private:

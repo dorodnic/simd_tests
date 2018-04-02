@@ -149,16 +149,16 @@ void main()
     }
     std::cout << std::endl;
 
-    //measure([&]()
-    //{
-    //    simd_ptr2.apply(test_app<decltype(simd_ptr2)>());
-    //});
+    measure([&]()
+    {
+        simd_ptr2.apply(test_app<decltype(simd_ptr2)>());
+    });
 
-    //for (int i = 0; i < 10; i++)
-    //{
-    //    std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
-    //}
-    //std::cout << std::endl;
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
 
     //auto x_gather = simd_data_gather<float, 0, 3>();
     //auto y_gather = simd_data_gather<float, 1, 3>();
