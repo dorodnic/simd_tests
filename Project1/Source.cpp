@@ -29,7 +29,7 @@ typedef struct rs2_extrinsics
 template<class T>
 void measure(T func)
 {
-    const auto cycles = 100;
+    const auto cycles = 5;
     auto start = std::chrono::high_resolution_clock::now();
     for (int j = 0; j < cycles; j++)
     {
@@ -93,6 +93,8 @@ void main()
     std::vector<char> input = read_bytes("test.bin");
     std::vector<char> output(input.size(), 0);
 
+    auto input_ptr = (float3*)input.data();
+    auto output_ptr = (float2*)output.data();
 
     const auto input_size = input.size() / sizeof(float3);
 
@@ -105,9 +107,6 @@ void main()
     {
         rs2_intrinsics intr{ 640, 480, 100, 200, 50, 70 };
         rs2_extrinsics extr{ { 1.1, 0.9, 0.2, 0.3, 0.9, 0.7, 0, 0.2, 0.3 },{ 0.1, 0.5, 0.6 } };
-
-        auto input_ptr = (float3*)input.data();
-        auto output_ptr = (float2*)output.data();
 
         for (int i = 0; i < input_size; i++)
         {
@@ -132,14 +131,34 @@ void main()
             xy.x = u; xy.y = v;
         }
     });
+
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
+
     measure([&]()
     {
         simd_ptr.apply(test_app<decltype(simd_ptr)>());
     });
-    measure([&]()
+
+    for (int i = 0; i < 10; i++)
     {
-        simd_ptr2.apply(test_app<decltype(simd_ptr2)>());
-    });
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
+
+    //measure([&]()
+    //{
+    //    simd_ptr2.apply(test_app<decltype(simd_ptr2)>());
+    //});
+
+    //for (int i = 0; i < 10; i++)
+    //{
+    //    std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    //}
+    //std::cout << std::endl;
 
     //auto x_gather = simd_data_gather<float, 0, 3>();
     //auto y_gather = simd_data_gather<float, 1, 3>();

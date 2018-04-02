@@ -16,12 +16,6 @@ typedef unsigned char byte;
 
 namespace simd
 {
-    template<class T, class S, T S::* ptr>
-    static constexpr int index_of()
-    {
-        return index_of_helper<T, S, ptr>::calc();
-    }
-
     enum engine_type
     {
         DEFAULT,
@@ -39,60 +33,19 @@ namespace simd
         {
         public:
             typedef T underlying_type;
+            typedef T representation_type;
 
-            FORCEINLINE native_simd(underlying_type data) : _data(data) {}
-            FORCEINLINE native_simd(const underlying_type* data) : _data(*data) {}
-            FORCEINLINE native_simd() : _data(T{}) {}
-            FORCEINLINE native_simd(const native_simd& data) { _data = data._data; }
+            template<class S>
+            FORCEINLINE static void constexpr load(T& target, S other)
+            {
+                target = other;
+            }
 
-            FORCEINLINE native_simd operator-(float y) const
+            template<class S>
+            FORCEINLINE static void constexpr store(const T& target, S* other)
             {
-                return native_simd(_data - y);
+                *other = target;
             }
-            FORCEINLINE native_simd operator+(float y) const
-            {
-                return native_simd(_data + y);
-            }
-            FORCEINLINE native_simd operator+(const native_simd& y) const
-            {
-                return native_simd(_data + y._data);
-            }
-            FORCEINLINE native_simd operator-(const native_simd& y) const
-            {
-                return native_simd(_data - y._data);
-            }
-            FORCEINLINE native_simd operator >> (float y) const
-            {
-                return native_simd(_data >> y);
-            }
-            FORCEINLINE native_simd operator<<(float y) const
-            {
-                return native_simd(_data << y);
-            }
-            FORCEINLINE native_simd operator*(float y) const
-            {
-                return native_simd(_data * y);
-            }
-            FORCEINLINE native_simd operator/(float y) const
-            {
-                return native_simd(_data / y);
-            }
-            FORCEINLINE native_simd min(float y) const
-            {
-                return native_simd(std::min(_data, y));
-            }
-            FORCEINLINE native_simd max(float y) const
-            {
-                return native_simd(std::max(_data, y));
-            }
-            FORCEINLINE void store(underlying_type* ptr) const
-            {
-                *ptr = _data;
-            }
-            operator underlying_type() const { return _data; }
-
-        private:
-            underlying_type _data;
         };
 
         template<class T, unsigned int START, unsigned int GAP>
@@ -133,6 +86,8 @@ namespace simd
         {
         public:
             typedef __m128i underlying_type;
+            typedef native_simd<uint16_t> representation_type;
+            typedef native_simd<float> this_type;
 
             FORCEINLINE native_simd(underlying_type data) : _data(data) {}
             FORCEINLINE native_simd(const underlying_type* data) : _data(_mm_loadu_si128(data)) {}
@@ -181,6 +136,17 @@ namespace simd
             }
             operator underlying_type() const { return _data; }
 
+            template<class S>
+            FORCEINLINE static void constexpr load(this_type& target, S other)
+            {
+                target.load(other);
+            }
+
+            template<class S>
+            FORCEINLINE static void constexpr store(const this_type& target, S* other)
+            {
+                target.store(other);
+            }
         private:
             underlying_type _data;
         };
@@ -190,6 +156,8 @@ namespace simd
         {
         public:
             typedef __m128 underlying_type;
+            typedef native_simd<float> representation_type;
+            typedef native_simd<float> this_type;
 
             FORCEINLINE native_simd(underlying_type data) : _data(data) {}
             FORCEINLINE native_simd(const underlying_type* data) : _data(_mm_castsi128_ps(_mm_loadu_si128((const __m128i*)data))) {}
@@ -228,8 +196,23 @@ namespace simd
             {
                 _mm_storeu_ps((float*)ptr, _data);
             }
+            FORCEINLINE void load(const underlying_type& ptr)
+            {
+                _data = ptr;
+            }
             operator underlying_type() const { return _data; }
 
+            template<class S>
+            FORCEINLINE static void constexpr load(this_type& target, S other)
+            {
+                target.load(other);
+            }
+
+            template<class S>
+            FORCEINLINE static void constexpr store(const this_type& target, S* other)
+            {
+                target.store(other);
+            }
         private:
             underlying_type _data;
         };
@@ -432,26 +415,28 @@ namespace simd
     class vector
     {
     public:
-        typedef typename E::template native_simd<T> simd_t;
+        typedef typename E::template native_simd<T> vectorized_wrapper;
+        typedef typename E::template native_simd<T>::representation_type simd_t;
+        typedef typename E::template native_simd<T>::underlying_type underlying_t;
         typedef vector<E, T, K> this_class;
         enum { blocks = K };
 
         FORCEINLINE vector() : _data() {}
         FORCEINLINE vector(simd_t vals[K]) : _data(vals) {}
-        FORCEINLINE vector(const typename simd_t::underlying_type* src)
+        FORCEINLINE vector(const typename underlying_t* src)
         {
             for (int i = 0; i < K; i++)
-                _data[i] = src + i;
+                vectorized_wrapper::load(_data[i], src[i]);
         }
-        FORCEINLINE void store(typename simd_t::underlying_type* ptr) const
+        FORCEINLINE void store(typename underlying_t* ptr) const
         {
             for (int i = 0; i < K; i++)
-                _data[i].store(ptr + i);
+                vectorized_wrapper::store(_data[i], ptr + i);
         }
 
         FORCEINLINE void assign(int idx, const simd_t& val)
         {
-            _data[idx] = val;
+            vectorized_wrapper::load(_data[idx], val);
         }
         FORCEINLINE const simd_t& fetch(int idx) const { return _data[idx]; }
 
