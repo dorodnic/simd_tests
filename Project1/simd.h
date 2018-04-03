@@ -3,6 +3,7 @@
 #include <assert.h>
 #include <type_traits>
 #include <tmmintrin.h>
+#include <array>
 
 #include "core.h"
 #include "sse.h"
@@ -192,15 +193,31 @@ namespace simd
                     ::template gather<gather_type, input_type>(block, result);
             }
 
-        public:
             template<unsigned int INDEX>
-            gather_type gather(const input_type& block) const
+            struct gather_loop
             {
-                static_assert(INDEX < elements_in, "Must be a valid feild index!");
+                static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
+                {
+                    perform_gather<INDEX>(block, results[INDEX]);
+                    gather_loop<INDEX - 1>::gather(block, results);
+                }
+            };
+            template<>
+            struct gather_loop<0>
+            {
+                static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
+                {
+                    perform_gather<0>(block, results[0]);
+                }
+            };
+
+        public:
+            std::array<gather_type, elements_in> gather(const input_type& block) const
+            {
                 static_assert(input_type::blocks == elements_in, "No extra unrolling assumption!");
 
-                gather_type result;
-                perform_gather<INDEX>(block, result);
+                std::array<gather_type, elements_in> result;
+                gather_loop<elements_in - 1>::gather(block, result);
                 return result;
             }
 

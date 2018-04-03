@@ -52,9 +52,10 @@ struct test_app
         for (auto i : ptr)
         {
             auto block = i.load();
-            auto x = i.gather<0>(block);
-            auto y = i.gather<1>(block);
-            auto z = i.gather<2>(block);
+            auto soa = i.gather(block);
+            auto x = soa[0];
+            auto y = soa[1];
+            auto z = soa[2];
 
             auto to_point_x = x* extr.rotation[0] + y* extr.rotation[3] + z * extr.rotation[6] + extr.translation[0];
             auto to_point_y = x* extr.rotation[1] + y* extr.rotation[4] + z * extr.rotation[7] + extr.translation[1];
