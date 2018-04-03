@@ -40,7 +40,7 @@ namespace simd
         struct gather_utils<float, START, GAP>
         {
             template<class GT, class QT>
-            static constexpr void gather(const QT& res, GT& result)
+            static void gather(const QT& res, GT& result)
             {
                 result.assign(0, res.fetch(START));
             }

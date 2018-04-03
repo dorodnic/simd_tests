@@ -103,7 +103,7 @@ namespace simd
             template<class GT, class QT, unsigned int J>
             struct gather_loop
             {
-                static constexpr void gather(const QT& res, GT& result)
+                static void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, J>(res, result);
                     gather_loop<GT, QT, J - 1>::gather(res, result);
@@ -112,14 +112,14 @@ namespace simd
             template<class GT, class QT>
             struct gather_loop<GT, QT, 0>
             {
-                static constexpr void gather(const QT& res, GT& result)
+                static void gather(const QT& res, GT& result)
                 {
                     do_gather<GT, QT, 0>(res, result);
                 }
             };
 
             template<class GT, class QT>
-            static constexpr void gather(const QT& res, GT& result)
+            static void gather(const QT& res, GT& result)
             {
                 // Go over every block of QT
                 // Do gather on it
@@ -162,7 +162,7 @@ namespace simd
             template<class OT, class ST, unsigned int J>
             struct scatter_loop
             {
-                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                static void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, J>(output_block, curr_var);
                     scatter_loop<OT, ST, J - 1>::scatter(output_block, curr_var);
@@ -171,7 +171,7 @@ namespace simd
             template<class OT, class ST>
             struct scatter_loop<OT, ST, 0>
             {
-                static constexpr void scatter(OT& output_block, const ST& curr_var)
+                static void scatter(OT& output_block, const ST& curr_var)
                 {
                     do_scatter<OT, ST, 0>(output_block, curr_var);
                 }
