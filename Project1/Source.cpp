@@ -90,7 +90,7 @@ static std::vector<char> read_bytes(char const* filename)
     return result;
 }
 
-void main()
+int main()
 {
     std::vector<char> input = read_bytes("test.bin");
     std::vector<char> output(input.size(), 0);

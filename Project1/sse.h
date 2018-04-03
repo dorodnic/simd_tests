@@ -10,11 +10,11 @@ namespace simd
     template<>
     struct engine<DEFAULT>
     {
-        template<typename T>
+        template<typename T, typename Dummy = int>
         struct native_simd {};
 
-        template<>
-        struct native_simd<float>
+        template<typename Dummy>
+        struct native_simd<float, Dummy>
         {
         public:
             typedef __m128 underlying_type;

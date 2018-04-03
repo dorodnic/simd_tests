@@ -24,12 +24,12 @@ namespace simd
 
         FORCEINLINE vector() : _data() {}
         FORCEINLINE vector(simd_t vals[K]) : _data(vals) {}
-        FORCEINLINE vector(const typename underlying_t* src)
+        FORCEINLINE vector(const underlying_t* src)
         {
             for (int i = 0; i < K; i++)
                 vectorized_wrapper::load(_data[i], src + i);
         }
-        FORCEINLINE void store(typename underlying_t* ptr) const
+        FORCEINLINE void store(underlying_t* ptr) const
         {
             for (int i = 0; i < K; i++)
                 vectorized_wrapper::store(_data[i], ptr + i);
@@ -191,7 +191,7 @@ namespace simd
             {
                 static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
                 {
-                    engine<ET>::template gather_utils<typename T1, INDEX - 1, elements_in>
+                    engine<ET>::template gather_utils<T1, INDEX - 1, elements_in>
                         ::template gather<gather_type, input_type>(block, results[INDEX - 1]);
 
                     gather_loop<INDEX - 1>::gather(block, results);
@@ -220,7 +220,7 @@ namespace simd
             {
                 const auto idx = INDEX;
                 const auto start = elements_out - INDEX - 1;
-                engine<ET>::template scatter_utils<typename T2, elements_out - INDEX - 1, elements_out>
+                engine<ET>::template scatter_utils<T2, elements_out - INDEX - 1, elements_out>
                     ::template scatter<output_type, scatter_type>(block, result);
             }
 
