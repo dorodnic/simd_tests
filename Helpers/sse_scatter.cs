@@ -61,6 +61,8 @@ namespace SSE_Scatter
             }
         }
 
+
+
         static void Main(string[] args)
         {
             PrintSSE_Scatter(6);

@@ -102,6 +102,8 @@ void main()
     using namespace simd;
     transformation<float, float3, float, float2, NAIVE>   simd_ptr((float*)input.data(), (float*)output.data(), input_size);
     transformation<float, float3, float, float2, DEFAULT> simd_ptr2((float*)input.data(), (float*)output.data(), input_size);
+    transformation<float, float3, float, float2, SUPERSPEED> simd_ptr3((float*)input.data(), (float*)output.data(), input_size);
+
 
     //simd_ptr.print(std::cout);
     //measure([&]()
@@ -158,6 +160,17 @@ void main()
     for (int i = 0; i < 10; i++)
     {
         std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
+
+    measure([&]()
+    {
+        simd_ptr3.apply(test_app<decltype(simd_ptr3)>());
+    });
+
+    for (int i = 0; i < 10; i++)
+    {
+        //std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
     }
     std::cout << std::endl;
 
