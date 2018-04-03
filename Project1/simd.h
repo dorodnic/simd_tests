@@ -58,12 +58,12 @@ namespace simd
 
         FORCEINLINE this_class operator-(float y)
         {
-            auto vec_y = vectorized_wrapper::vectorize(y);
+            simd_t vec_y = vectorized_wrapper::vectorize(y);
             return{ *this, [&](simd_t& item) { return item - vec_y; } };
         }
         FORCEINLINE this_class operator+(float y)
         {
-            auto vec_y = vectorized_wrapper::vectorize(y);
+            simd_t vec_y = vectorized_wrapper::vectorize(y);
             return{ *this, [&](simd_t& item) { return item + vec_y; } };
         }
         FORCEINLINE this_class operator+(const this_class& y)
@@ -76,7 +76,7 @@ namespace simd
         }
         FORCEINLINE this_class operator*(float y)
         {
-            auto vec_y = vectorized_wrapper::vectorize(y);
+            simd_t vec_y = vectorized_wrapper::vectorize(y);
             return{ *this, [&](simd_t& item) { return item * vec_y; } };
         }
         FORCEINLINE this_class operator/(const this_class& y)
@@ -85,7 +85,7 @@ namespace simd
         }
         FORCEINLINE this_class operator/(float y)
         {
-            auto vec_y = vectorized_wrapper::vectorize(y);
+            simd_t vec_y = vectorized_wrapper::vectorize(y);
             return{ *this, [&](simd_t& item) { return item / vec_y; } };
         }
 
@@ -186,7 +186,7 @@ namespace simd
             /// ========================= GATHER ===============================================
 
         private:
-            template<unsigned int INDEX>
+            template<unsigned int INDEX, typename Dummy = int>
             struct gather_loop
             {
                 static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
@@ -197,8 +197,8 @@ namespace simd
                     gather_loop<INDEX - 1>::gather(block, results);
                 }
             };
-            template<>
-            struct gather_loop<0>
+            template<typename Dummy>
+            struct gather_loop<0, Dummy>
             {
                 FORCEINLINE static void gather(const input_type& block, std::array<gather_type, elements_in>& results) {}
             };
