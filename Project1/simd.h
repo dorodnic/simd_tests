@@ -186,29 +186,21 @@ namespace simd
             /// ========================= GATHER ===============================================
 
         private:
-            template<int INDEX>
-            static void perform_gather(const input_type& block, gather_type& result)
-            {
-                engine<ET>::template gather_utils<typename T1, INDEX, elements_in>
-                    ::template gather<gather_type, input_type>(block, result);
-            }
-
             template<unsigned int INDEX>
             struct gather_loop
             {
                 static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
                 {
-                    perform_gather<INDEX>(block, results[INDEX]);
+                    engine<ET>::template gather_utils<typename T1, INDEX - 1, elements_in>
+                        ::template gather<gather_type, input_type>(block, results[INDEX - 1]);
+
                     gather_loop<INDEX - 1>::gather(block, results);
                 }
             };
             template<>
             struct gather_loop<0>
             {
-                static void gather(const input_type& block, std::array<gather_type, elements_in>& results)
-                {
-                    perform_gather<0>(block, results[0]);
-                }
+                FORCEINLINE static void gather(const input_type& block, std::array<gather_type, elements_in>& results) {}
             };
 
         public:
@@ -217,7 +209,7 @@ namespace simd
                 static_assert(input_type::blocks == elements_in, "No extra unrolling assumption!");
 
                 std::array<gather_type, elements_in> result;
-                gather_loop<elements_in - 1>::gather(block, result);
+                gather_loop<elements_in>::gather(block, result);
                 return result;
             }
 
