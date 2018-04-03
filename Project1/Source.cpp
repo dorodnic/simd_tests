@@ -103,44 +103,44 @@ int main()
     using namespace simd;
     transformation<float, float3, float, float2, NAIVE>   simd_ptr((float*)input.data(), (float*)output.data(), input_size);
     transformation<float, float3, float, float2, DEFAULT> simd_ptr2((float*)input.data(), (float*)output.data(), input_size);
-    //transformation<float, float3, float, float2, SUPERSPEED> simd_ptr3((float*)input.data(), (float*)output.data(), input_size);
+    transformation<float, float3, float, float2, SUPERSPEED> simd_ptr3((float*)input.data(), (float*)output.data(), input_size);
+
+    simd_ptr.print(std::cout);
+
+    measure([&]()
+    {
+        rs2_intrinsics intr{ 640, 480, 100, 200, 50, 70 };
+        rs2_extrinsics extr{ { 1.1, 0.9, 0.2, 0.3, 0.9, 0.7, 0, 0.2, 0.3 },{ 0.1, 0.5, 0.6 } };
+
+        for (int i = 0; i < input_size; i++)
+        {
+            auto&& xyz = input_ptr[i];
+            auto&& xy = output_ptr[i];
+
+            auto x = xyz.x; auto y = xyz.y; auto z = xyz.z;
+
+            auto to_point_x = x * extr.rotation[0] + y* extr.rotation[3] + z * extr.rotation[6] + extr.translation[0];
+            auto to_point_y = x * extr.rotation[1] + y* extr.rotation[4] + z * extr.rotation[7] + extr.translation[1];
+            auto to_point_z = x * extr.rotation[2] + y* extr.rotation[5] + z * extr.rotation[8] + extr.translation[2];
+
+            auto u1 = to_point_x / to_point_z, v1 = to_point_y / to_point_z;
 
 
-    //simd_ptr.print(std::cout);
-    //measure([&]()
-    //{
-    //    rs2_intrinsics intr{ 640, 480, 100, 200, 50, 70 };
-    //    rs2_extrinsics extr{ { 1.1, 0.9, 0.2, 0.3, 0.9, 0.7, 0, 0.2, 0.3 },{ 0.1, 0.5, 0.6 } };
+            auto px = u1 * intr.fx + intr.ppx;
+            auto py = v1 * intr.fy + intr.ppy;
 
-    //    for (int i = 0; i < input_size; i++)
-    //    {
-    //        auto&& xyz = input_ptr[i];
-    //        auto&& xy = output_ptr[i];
+            auto u = px / (intr.width);
+            auto v = py / (intr.height);
 
-    //        auto x = xyz.x; auto y = xyz.y; auto z = xyz.z;
+            xy.x = u; xy.y = v;
+        }
+    });
 
-    //        auto to_point_x = x * extr.rotation[0] + y* extr.rotation[3] + z * extr.rotation[6] + extr.translation[0];
-    //        auto to_point_y = x * extr.rotation[1] + y* extr.rotation[4] + z * extr.rotation[7] + extr.translation[1];
-    //        auto to_point_z = x * extr.rotation[2] + y* extr.rotation[5] + z * extr.rotation[8] + extr.translation[2];
-
-    //        auto u1 = to_point_x / to_point_z, v1 = to_point_y / to_point_z;
-
-
-    //        auto px = u1 * intr.fx + intr.ppx;
-    //        auto py = v1 * intr.fy + intr.ppy;
-
-    //        auto u = px / (intr.width);
-    //        auto v = py / (intr.height);
-
-    //        xy.x = u; xy.y = v;
-    //    }
-    //});
-
-    //for (int i = 0; i < 10; i++)
-    //{
-    //    std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
-    //}
-    //std::cout << std::endl;
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
 
     measure([&]()
     {
@@ -166,7 +166,7 @@ int main()
 
     measure([&]()
     {
-        //simd_ptr3.apply(test_app<decltype(simd_ptr3)>());
+        simd_ptr3.apply(test_app<decltype(simd_ptr3)>());
     });
 
     for (int i = 0; i < 10; i++)

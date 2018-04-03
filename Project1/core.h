@@ -20,6 +20,11 @@ namespace simd
         SUPERSPEED,
     };
 
-    template<engine_type ST>
-    struct engine { };
+    template<engine_type ET>
+    struct engine {
+        bool can_run() { return false; }
+    };
+
+    template<engine_type ET>
+    struct fallback_engine { static const engine_type FT = ET; };
 }

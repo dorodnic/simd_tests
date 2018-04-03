@@ -115,6 +115,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="avx.h" />
+    <ClInclude Include="avx_shuffle.h" />
     <ClInclude Include="core.h" />
     <ClInclude Include="naive.h" />
     <ClInclude Include="simd.h" />

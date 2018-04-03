@@ -79,22 +79,20 @@ namespace SSE_Scatter
                     for (int line = 0; line < gap; line++)
                     {
                         int[] bits = new int[8];
-                        uint m = 0;
+                        int[] m = new int[8];
                         for (int i = 0; i < 8; i++)
                         {
                             bits[i] = permutation[line * 8 + i];
+                            m[i] = (mask[line * 8 + i] > 0) ? 0xff : 0;
                         }
 
-                        m = (mask[line * 4] * 0xff) +
-                            ((mask[line * 4 + 1] * 0xff) << 8) +
-                            ((mask[line * 4 + 2] * 0xff) << 16) +
-                            ((mask[line * 4 + 3] * 0xff) << 24);
-
                         Console.WriteLine("SET_SCATTER_SHUFFLE(" + gap + ", " + offset + ", " + line +
-                            ", _MM_SHUFFLE(" + string.Join(", ", 
+                            ", _mm256_set_epi32(" + string.Join(", ", 
                             bits.Reverse()
-                            ) + "), 0x"
-                            + m.ToString("X8") + ");");
+                            ) + "), _mm256_set_epi32("
+                            + string.Join(", ",
+                            m.Reverse().Select(x => "0x" + x.ToString("X2"))
+                            ) + "));");
 
                         int[] gbits = new int[8];
                         uint[] gmaks = new uint[8];
@@ -108,14 +106,11 @@ namespace SSE_Scatter
                             }
                         }
 
-                        m = (gmaks[0] * 0xff) +
-                            ((gmaks[1] * 0xff) << 8) +
-                            ((gmaks[2] * 0xff) << 16) +
-                            ((gmaks[3] * 0xff) << 24);
-
                         Console.WriteLine("SET_GATHER_SHUFFLE(" + gap + ", " + offset + ", " + line +
-                            ", _MM_SHUFFLE(" + string.Join(", ", gbits.Reverse()) + "), 0x"
-                            + m.ToString("X8") + ");");
+                            ", _mm256_set_epi32(" + string.Join(", ", gbits.Reverse()) + "), _mm256_set_epi32("
+                            + string.Join(", ",
+                            gmaks.Reverse().Select(x => "0x" + x.ToString("X2"))
+                            ) + "));");
                     }
                 }
             }

@@ -7,6 +7,8 @@ namespace simd
     template<>
     struct engine<NAIVE>
     {
+        static bool can_run() { return true; }
+
         template<typename T>
         struct native_simd
         {

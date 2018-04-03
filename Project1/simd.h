@@ -168,7 +168,14 @@ namespace simd
         template<class T>
         void apply(T action)
         {
-            action(*this);
+            if (engine<ET>::can_run())
+            {
+                action(*this);
+            }
+            else
+            {
+                std::cout << "Engine not supported!" << std::endl;
+            }
         }
 
         class iterator

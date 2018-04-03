@@ -8,8 +8,13 @@
 namespace simd
 {
     template<>
+    struct fallback_engine<DEFAULT> { static const engine_type FT = NAIVE; };
+
+    template<>
     struct engine<DEFAULT>
     {
+        static bool can_run()  { return true; }
+
         template<typename T, typename Dummy = int>
         struct native_simd {};
 
@@ -105,17 +110,14 @@ namespace simd
             {
                 static void gather(const QT& res, GT& result)
                 {
-                    do_gather<GT, QT, J>(res, result);
+                    do_gather<GT, QT, J - 1>(res, result);
                     gather_loop<GT, QT, J - 1>::gather(res, result);
                 }
             };
             template<class GT, class QT>
             struct gather_loop<GT, QT, 0>
             {
-                static void gather(const QT& res, GT& result)
-                {
-                    do_gather<GT, QT, 0>(res, result);
-                }
+                static void gather(const QT& res, GT& result) {}
             };
 
             template<class GT, class QT>
@@ -124,7 +126,7 @@ namespace simd
                 // Go over every block of QT
                 // Do gather on it
                 // Merge everything into block GT[I]
-                gather_loop<GT, QT, QT::blocks - 1>::gather(res, result);
+                gather_loop<GT, QT, QT::blocks>::gather(res, result);
             }
         };
 
@@ -164,23 +166,20 @@ namespace simd
             {
                 static void scatter(OT& output_block, const ST& curr_var)
                 {
-                    do_scatter<OT, ST, J>(output_block, curr_var);
+                    do_scatter<OT, ST, J - 1>(output_block, curr_var);
                     scatter_loop<OT, ST, J - 1>::scatter(output_block, curr_var);
                 }
             };
             template<class OT, class ST>
             struct scatter_loop<OT, ST, 0>
             {
-                static void scatter(OT& output_block, const ST& curr_var)
-                {
-                    do_scatter<OT, ST, 0>(output_block, curr_var);
-                }
+                static void scatter(OT& output_block, const ST& curr_var) {}
             };
 
             template<class OT, class ST>
             static void scatter(OT& output_block, const ST& curr_var)
             {
-                scatter_loop<OT, ST, OT::blocks - 1>::scatter(output_block, curr_var);
+                scatter_loop<OT, ST, OT::blocks>::scatter(output_block, curr_var);
             }
         };
     };
