@@ -4,11 +4,7 @@
 
 #include "sse_shuffle.h"
 
-#ifdef _MSC_VER
-#define FORCEINLINE __forceinline
-#else
-#define FORCEINLINE inline __attribute__((always_inline))
-#endif
+
 //
 //FORCEINLINE static __m128 operator-(const __m128& data, const __m128& other)
 //{

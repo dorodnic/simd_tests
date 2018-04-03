@@ -56,21 +56,21 @@ struct test_app
             auto y = i.gather<1>(block);
             auto z = i.gather<2>(block);
 
-            //auto to_point_x = x* extr.rotation[0] + y* extr.rotation[3] + z * extr.rotation[6] + extr.translation[0];
-            //auto to_point_y = x* extr.rotation[1] + y* extr.rotation[4] + z * extr.rotation[7] + extr.translation[1];
-            //auto to_point_z = x* extr.rotation[2] + y* extr.rotation[5] + z * extr.rotation[8] + extr.translation[2];
+            auto to_point_x = x* extr.rotation[0] + y* extr.rotation[3] + z * extr.rotation[6] + extr.translation[0];
+            auto to_point_y = x* extr.rotation[1] + y* extr.rotation[4] + z * extr.rotation[7] + extr.translation[1];
+            auto to_point_z = x* extr.rotation[2] + y* extr.rotation[5] + z * extr.rotation[8] + extr.translation[2];
 
-            //auto u1 = to_point_x / to_point_z, v1 = to_point_y / to_point_z;
+            auto u1 = to_point_x / to_point_z, v1 = to_point_y / to_point_z;
 
 
-            //auto px = u1 * intr.fx + intr.ppx;
-            //auto py = v1 * intr.fy + intr.ppy;
+            auto px = u1 * intr.fx + intr.ppx;
+            auto py = v1 * intr.fy + intr.ppy;
 
-            //auto u = px / (intr.width);
-            //auto v = py / (intr.height);
+            auto u = px / (intr.width);
+            auto v = py / (intr.height);
 
-            //auto out_block = i.scatter(u, v);
-            auto out_block = i.scatter(x, y);
+            auto out_block = i.scatter(u, v);
+            //auto out_block = i.scatter(x, y);
             i.store(out_block);
         }
     }
@@ -100,7 +100,7 @@ void main()
     const auto input_size = input.size() / sizeof(float3);
 
     using namespace simd;
-    //transformation<float, float3, float, float2, NAIVE>   simd_ptr((float*)input.data(), (float*)output.data(), input_size);
+    transformation<float, float3, float, float2, NAIVE>   simd_ptr((float*)input.data(), (float*)output.data(), input_size);
     transformation<float, float3, float, float2, DEFAULT> simd_ptr2((float*)input.data(), (float*)output.data(), input_size);
 
     //simd_ptr.print(std::cout);
@@ -139,41 +139,27 @@ void main()
     //}
     //std::cout << std::endl;
 
-    //measure([&]()
-    //{
-    //    simd_ptr.apply(test_app<decltype(simd_ptr)>());
-    //});
+    measure([&]()
+    {
+        simd_ptr.apply(test_app<decltype(simd_ptr)>());
+    });
 
-    //for (int i = 0; i < 10; i++)
-    //{
-    //    std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
-    //}
-    //std::cout << std::endl;
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
 
     measure([&]()
     {
         simd_ptr2.apply(test_app<decltype(simd_ptr2)>());
     });
 
-    //for (int i = 0; i < 10; i++)
-    //{
-    //    std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
-    //}
-    //std::cout << std::endl;
-
-    ////auto x_gather = simd_data_gather<float, 0, 3>();
-    ////auto y_gather = simd_data_gather<float, 1, 3>();
-    ////auto z_gather = simd_data_gather<float, 2, 3>();
-
-    ////for (auto i : simd_ptr)
-    ////{
-    ////    auto x = i.gather(x_gather);
-    ////    auto y = i.gather(y_gather);
-    ////    auto z = i.gather(z_gather);
-
-    ////    simd_item<float> data[2] = { x, y };
-    ////    i.scatter(data);
-    ////}
+    for (int i = 0; i < 10; i++)
+    {
+        std::cout << output_ptr[i].x << ", " << output_ptr[i].y << "  ";
+    }
+    std::cout << std::endl;
 
     int x;
     std::cin >> x;
